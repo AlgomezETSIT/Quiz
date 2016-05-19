@@ -5,71 +5,88 @@ var Sequelize = require('sequelize');
 
 // Autoload el quiz asociado a :quizId
 exports.load = function(req, res, next, quizId) {
-	models.Quiz.findById(quizId, {include: [models.Comment]})
-  		.then(function(quiz) {
-      		if (quiz) {
-        		req.quiz = quiz;
-        		next();
-      		} else { 
-      			throw new Error('No existe quizId=' + quizId);
-      		}
+  models.Quiz.findById(quizId, { include: [ models.Comment ] })
+      .then(function(quiz) {
+          if (quiz) {
+            req.quiz = quiz;
+            next();
+          } else { 
+            throw new Error('No existe quizId=' + quizId);
+          }
         })
         .catch(function(error) { next(error); });
 };
 
 
-// GET /quizzes
-exports.index = function(req, res, next) {
-	var search = req.query.search || '';
+// MW que permite acciones solamente si al usuario logeado es admin o es el autor del quiz.
+exports.ownershipRequired = function(req, res, next){
 
-	if (search !== "") {
-		search_sql = "%"+search.replace(/ /g, "%")+"%";
+    var isAdmin      = req.session.user.isAdmin;
+    var quizAuthorId = req.quiz.AuthorId;
+    var loggedUserId = req.session.user.id;
 
-		models.Quiz.findAll({where: ["question like ?", search_sql]})
-			.then(function(quizzes) {
-				quizzes.sort(function(a, b) {
-					return a.question.localeCompare(b.question);
-				});
-				res.render('quizzes/index.ejs', { quizzes: quizzes,
-												  search: search});
-			})
-			.catch(function(error) {
-				next(error);
-			});
-	}
-	else {
-		models.Quiz.findAll()
-			.then(function(quizzes) {
-				res.render('quizzes/index.ejs', { quizzes: quizzes,
-												  search: search});
-			})
-			.catch(function(error) {
-				next(error);
-			});
-	}
+    if (isAdmin || quizAuthorId === loggedUserId) {
+        next();
+    } else {
+      console.log('Operación prohibida: El usuario logeado no es el autor del quiz, ni un administrador.');
+      res.send(403);
+    }
 };
 
+
+// GET /quizzes
+exports.index = function(req, res, next) {
+
+  var search = req.query.search || '';
+
+  if (search !== "") {
+    search_sql = "%"+search.replace(/ /g, "%")+"%";
+
+    models.Quiz.findAll({where: ["question like ?", search_sql]})
+      .then(function(quizzes) {
+        quizzes.sort(function(a, b) {
+          return a.question.localeCompare(b.question);
+        });
+        res.render('quizzes/index.ejs', { quizzes: quizzes,
+                          search: search});
+      })
+      .catch(function(error) {
+        next(error);
+      });
+  }
+  else {
+    models.Quiz.findAll()
+      .then(function(quizzes) {
+        res.render('quizzes/index.ejs', { quizzes: quizzes,
+                          search: search});
+      })
+      .catch(function(error) {
+        next(error);
+      });
+  }
+
+};
 
 // GET /quizzes/:id
 exports.show = function(req, res, next) {
 
-	var answer = req.query.answer || '';
+  var answer = req.query.answer || '';
 
-	res.render('quizzes/show', {quiz: req.quiz,
-								answer: answer});
+  res.render('quizzes/show', {quiz: req.quiz,
+                answer: answer});
 };
 
 
 // GET /quizzes/:id/check
 exports.check = function(req, res, next) {
 
-	var answer = req.query.answer || "";
+  var answer = req.query.answer || "";
 
-	var result = answer === req.quiz.answer ? 'Correcta' : 'Incorrecta';
+  var result = answer === req.quiz.answer ? 'Correcta' : 'Incorrecta';
 
-	res.render('quizzes/result', { quiz: req.quiz, 
-								   result: result, 
-								   answer: answer });
+  res.render('quizzes/result', { quiz: req.quiz, 
+                   result: result, 
+                   answer: answer });
 };
 
 
@@ -110,7 +127,6 @@ exports.create = function(req, res, next) {
 };
 
 
-
 // GET /quizzes/:id/edit
 exports.edit = function(req, res, next) {
   var quiz = req.quiz;  // req.quiz: autoload de instancia de quiz
@@ -127,7 +143,7 @@ exports.update = function(req, res, next) {
 
   req.quiz.save({fields: ["question", "answer"]})
     .then(function(quiz) {
-	  req.flash('success', 'Quiz editado con éxito.');
+    req.flash('success', 'Quiz editado con éxito.');
       res.redirect('/quizzes'); // Redirección HTTP a lista de preguntas.
     })
     .catch(Sequelize.ValidationError, function(error) {
@@ -140,7 +156,7 @@ exports.update = function(req, res, next) {
       res.render('quizzes/edit', {quiz: req.quiz});
     })
     .catch(function(error) {
-	  req.flash('error', 'Error al editar el Quiz: '+error.message);
+    req.flash('error', 'Error al editar el Quiz: '+error.message);
       next(error);
     });
 };
@@ -150,11 +166,14 @@ exports.update = function(req, res, next) {
 exports.destroy = function(req, res, next) {
   req.quiz.destroy()
     .then( function() {
-	  req.flash('success', 'Quiz borrado con éxito.');
+    req.flash('success', 'Quiz borrado con éxito.');
       res.redirect('/quizzes');
     })
     .catch(function(error){
-	  req.flash('error', 'Error al editar el Quiz: '+error.message);
+    req.flash('error', 'Error al editar el Quiz: '+error.message);
       next(error);
     });
 };
+
+
+
