@@ -10,12 +10,17 @@ var flash = require('express-flash');
 var methodOverride = require('method-override');
 
 var routes = require('./routes/index');
+var sessionController = require('./controllers/session_controller');
 
 var app = express();
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
+
+// Autologout
+app.use(sessionController.autologout);
+
 
 // En produccion (Heroku) redirijo las peticiones http a https.
 // Documentacion: http://jaketrent.com/post/https-redirect-node-heroku/
