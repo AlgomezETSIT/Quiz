@@ -11,7 +11,7 @@ var cloudinary_image_options = { crop: 'limit', width: 200, height: 200, radius:
 
 // Autoload el quiz asociado a :quizId
 exports.load = function(req, res, next, quizId) {
-  models.Quiz.findById(quizId, { include: [ models.Comment, models.Attachment ] })
+  models.Quiz.findById(quizId, {attributes: ['id', 'question', 'answer'], include: [ models.Comment, models.Attachment ] })
       .then(function(quiz) {
           if (quiz) {
             req.quiz = quiz;
@@ -48,23 +48,38 @@ exports.index = function(req, res, next) {
   if (search !== "") {
     search_sql = "%"+search.replace(/ /g, "%")+"%";
 
-    models.Quiz.findAll({where: ["question like ?", search_sql], include: [ models.Attachment ] })
+    models.Quiz.findAll({where: ["question like ?", search_sql], include: [ models.Attachment ],
+      order: ['question'],
+       attributes: ['id', 'question', 'answer']})
       .then(function(quizzes) {
-        quizzes.sort(function(a, b) {
-          return a.question.localeCompare(b.question);
-        });
-        res.render('quizzes/index.ejs', { quizzes: quizzes,
-                          search: search});
+        if (!req.params.format || req.params.format === "html") {
+            res.render('quizzes/index.ejs', { quizzes: quizzes,
+                        search: search});
+        }
+        else if (req.params.format === "json") {
+          res.send(JSON.stringify(quizzes));
+        }
+        else {
+          throw new Error('No se admite format=' + req.params.format);
+        }
       })
       .catch(function(error) {
         next(error);
       });
   }
   else {
-    models.Quiz.findAll({ include: [ models.Attachment ] })
+    models.Quiz.findAll({ attributes: ['id', 'question', 'answer'], include: [ models.Attachment ] })
       .then(function(quizzes) {
-        res.render('quizzes/index.ejs', { quizzes: quizzes,
-                          search: search});
+        if (!req.params.format || req.params.format === "html") {
+            res.render('quizzes/index.ejs', { quizzes: quizzes,
+                        search: search});
+        }
+        else if (req.params.format === "json") {
+          res.send(JSON.stringify(quizzes));
+        }
+        else {
+          throw new Error('No se admite format=' + req.params.format);
+        }
       })
       .catch(function(error) {
         next(error);
@@ -76,10 +91,18 @@ exports.index = function(req, res, next) {
 // GET /quizzes/:quizId
 exports.show = function(req, res, next) {
 
-  var answer = req.query.answer || '';
+ if (!req.params.format || req.params.format === "html") {
+   var answer = req.query.answer || '';
 
-  res.render('quizzes/show', {quiz: req.quiz,
-                answer: answer});
+   res.render('quizzes/show', {quiz: req.quiz,
+                 answer: answer});
+  }
+  else if (req.params.format === "json") {
+    res.send(JSON.stringify(req.quiz));
+  }
+  else {
+    throw new Error('No se admite format=' + req.params.format);
+  }
 };
 
 
